@@ -6,6 +6,7 @@
 use rand::RngCore;
 use std::fmt::{Debug, Display};
 use std::iter::IntoIterator;
+use std::convert::AsRef;
 
 trait OctetHex<'a>
 where
@@ -22,6 +23,7 @@ where
 
 impl<'a> OctetHex<'a> for &'a [u8] {}
 
+#[derive(PartialEq, Eq)]
 pub struct UUID(u128);
 
 impl Display for UUID {
@@ -89,12 +91,8 @@ impl UUID {
 
         UUID(u128::from_be_bytes(octets))
     }
-}
 
-impl TryFrom<&str> for UUID {
-    type Error = ();
-
-    fn try_from(mut value: &str) -> Result<Self, Self::Error> {
+    pub fn parse<T: AsRef<str>>(value: T) -> Result<Self, ()> {
         // Parses the following formats:
         //      8-4-4-4-12 format:
         //          aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
@@ -105,6 +103,8 @@ impl TryFrom<&str> for UUID {
         //      32-length hex string format with 0x or 0X prefix:
         //          0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         //          0Xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+        let mut value = value.as_ref();
 
         if value.starts_with("0x") {
             value = value.strip_prefix("0x").unwrap();
@@ -155,10 +155,58 @@ impl TryFrom<&str> for UUID {
     }
 }
 
+impl TryFrom<&str> for UUID {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        UUID::parse(value)
+    }
+}
+
+impl TryFrom<String> for UUID {
+    type Error = ();
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        UUID::parse(value)
+    }
+}
+
 #[non_exhaustive]
 pub struct WellKnownUUID {}
 
 #[allow(non_upper_case_globals)]
 impl WellKnownUUID {
     pub const Nil: UUID = UUID(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_v4_version() {
+        let uuid = UUID::v4();
+        assert_eq!(uuid.0.to_be_bytes()[6] & 0xf0, 0x40);
+    }
+
+    #[test]
+    fn test_format() {
+        let uuid = UUID::from_val(339909213143343215632204095398962575718);
+
+        assert_eq!(format!("{uuid}"), "ffb82219-2be8-4961-8c83-2163e1b4b966");
+        assert_eq!(uuid.to_string_hex(), "ffb82219-2be8-4961-8c83-2163e1b4b966");
+        assert_eq!(
+            uuid.to_string_hex_joined(),
+            "ffb822192be849618c832163e1b4b966"
+        );
+    }
+
+    #[test]
+    fn test_parse() {
+        let uuid = UUID::v4();
+
+        assert_eq!(uuid, uuid.to_string_hex().try_into().unwrap());
+        assert_eq!(uuid, uuid.to_string_hex_joined().try_into().unwrap());
+        assert_eq!(uuid, UUID::from_val(uuid.value()));
+    }
 }
