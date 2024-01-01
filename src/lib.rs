@@ -73,25 +73,21 @@ impl UUID {
     }
 }
 
-impl UUID {
-    pub fn v4() -> UUID {
-        let mut octets = [0u8; 16];
-        let mut rng = rand::thread_rng();
-        rng.fill_bytes(&mut octets);
+pub fn v4() -> UUID {
+    let mut octets = [0u8; 16];
+    let mut rng = rand::thread_rng();
+    rng.fill_bytes(&mut octets);
 
-        octets[6] = (octets[6] & 0x0f) | 0x40;
-        octets[8] = (octets[8] & 0x3f) | 0x80;
+    octets[6] = (octets[6] & 0x0f) | 0x40;
+    octets[8] = (octets[8] & 0x3f) | 0x80;
 
-        UUID(u128::from_be_bytes(octets))
-    }
+    UUID(u128::from_be_bytes(octets))
+}
 
-    /*
+#[non_exhaustive]
+pub struct WellKnownUUID {}
 
-    pub fn v1() {}
-    pub fn v2() {}
-    pub fn v3(namespace: UUID, name: &str) {}
-    pub fn v4() {}
-    pub fn v5(namespace: UUID, name: &str) {}
-
-    */
+#[allow(non_upper_case_globals)]
+impl WellKnownUUID {
+    pub const Nil: UUID = UUID(0);
 }

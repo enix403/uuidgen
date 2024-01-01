@@ -3,10 +3,12 @@
 #![allow(unused_mut)]
 #![allow(dead_code)]
 
-use uuidgen::UUID;
+use uuidgen::WellKnownUUID;
 
 fn main() {
-    let uuid = UUID::v4();
+    let uuid = uuidgen::v4();
+
+    println!("{}", WellKnownUUID::Nil);
 
     println!("{}", uuid.to_string_hex());
     println!("{}", uuid.to_string_hex_joined());
