@@ -3,10 +3,12 @@
 #![allow(unused_mut)]
 #![allow(dead_code)]
 
+use uuidgen::UUID;
+
 fn main() {
-    let value = uuidgen::v4();
+    let uuid = UUID::v4();
 
-    let output = format!("{}", value);
-
-    println!("{}", output);
+    println!("{}", uuid.to_string_hex());
+    println!("{}", uuid.to_string_hex_joined());
+    println!("{}", uuid.value());
 }
