@@ -53,6 +53,10 @@ impl Debug for UUID {
 }
 
 impl UUID {
+    pub fn from_val(value: u128) -> Self {
+        Self(value)
+    }
+
     pub fn to_string_hex(&self) -> String {
         format!("{self}")
     }
@@ -71,6 +75,52 @@ impl UUID {
     pub fn value(&self) -> u128 {
         self.0
     }
+}
+
+impl TryFrom<&str> for UUID {
+    type Error = ();
+    
+        fn try_from(value: &str) -> Result<Self, Self::Error> {
+            let mut intval = 0u128;
+            let mut consumed = 0;
+
+            for s in value.chars() {
+                let as_int: u128 = match s {
+                    '0' => 0,
+                    '1' => 1,
+                    '2' => 2,
+                    '3' => 3,
+                    '4' => 4,
+                    '5' => 5,
+                    '6' => 6,
+                    '7' => 7,
+                    '8' => 8,
+                    '9' => 9,
+                    'a' | 'A' => 10,
+                    'b' | 'B' => 11,
+                    'c' | 'C' => 12,
+                    'd' | 'D' => 13,
+                    'e' | 'E' => 14,
+                    'f' | 'F' => 15,
+                    '-' => continue,
+                    _ => return Err(()),
+                };
+
+                intval = intval << 4 | as_int;
+                consumed += 1;
+
+                if consumed == 32 {
+                    break;
+                }
+            }
+
+            if consumed == 32 {
+                Ok(UUID(intval))
+            } else {
+                Err(())
+            }
+        }
+    
 }
 
 pub fn v4() -> UUID {
