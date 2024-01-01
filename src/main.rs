@@ -6,7 +6,7 @@
 use uuidgen::{UUID, WellKnownUUID};
 
 fn main() {
-    let uuid = UUID::v4();
+    let uuid = UUID::v5(UUID::v4(), b"foo");
     println!("{}", uuid.to_string_hex());
     println!("{}", uuid.to_string_hex_joined());
     println!("{}", uuid.value());

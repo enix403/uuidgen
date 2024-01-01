@@ -8,7 +8,9 @@ use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::iter::IntoIterator;
 
-use md5::{Digest, Md5};
+use digest::Digest;
+use md5::Md5;
+use sha1::Sha1;
 
 trait OctetHex<'a>
 where
@@ -88,7 +90,7 @@ impl UUID {
         UUID(u128::from_be_bytes(octets))
     }
 
-    fn digest_based_uuid<D: Digest>(
+    fn hash_based_uuid<D: Digest>(
         mut hasher: D,
         namespace: UUID,
         name: &[u8],
@@ -107,7 +109,7 @@ impl UUID {
     }
 
     pub fn v3(namespace: UUID, name: &[u8]) -> Self {
-        Self::digest_based_uuid(<Md5 as Digest>::new(), namespace, name, 3)
+        Self::hash_based_uuid(<Md5 as Digest>::new(), namespace, name, 3)
     }
 
     pub fn v4() -> UUID {
@@ -116,6 +118,10 @@ impl UUID {
         rng.fill_bytes(&mut octets);
 
         Self::finalize_octets(octets, 4)
+    }
+
+    pub fn v5(namespace: UUID, name: &[u8]) -> Self {
+        Self::hash_based_uuid(<Sha1 as Digest>::new(), namespace, name, 5)
     }
 
     pub fn parse<T: AsRef<str>>(value: T) -> Result<Self, ()> {
