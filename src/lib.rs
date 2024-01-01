@@ -75,63 +75,84 @@ impl UUID {
     pub fn value(&self) -> u128 {
         self.0
     }
+
+    pub fn v4() -> UUID {
+        let mut octets = [0u8; 16];
+        let mut rng = rand::thread_rng();
+        rng.fill_bytes(&mut octets);
+
+        // Set the version bits
+        octets[6] = (octets[6] & 0x0f) | 0x40;
+
+        // Set the reserved variant bits
+        octets[8] = (octets[8] & 0x3f) | 0x80;
+
+        UUID(u128::from_be_bytes(octets))
+    }
 }
 
 impl TryFrom<&str> for UUID {
     type Error = ();
-    
-        fn try_from(value: &str) -> Result<Self, Self::Error> {
-            let mut intval = 0u128;
-            let mut consumed = 0;
 
-            for s in value.chars() {
-                let as_int: u128 = match s {
-                    '0' => 0,
-                    '1' => 1,
-                    '2' => 2,
-                    '3' => 3,
-                    '4' => 4,
-                    '5' => 5,
-                    '6' => 6,
-                    '7' => 7,
-                    '8' => 8,
-                    '9' => 9,
-                    'a' | 'A' => 10,
-                    'b' | 'B' => 11,
-                    'c' | 'C' => 12,
-                    'd' | 'D' => 13,
-                    'e' | 'E' => 14,
-                    'f' | 'F' => 15,
-                    '-' => continue,
-                    _ => return Err(()),
-                };
+    fn try_from(mut value: &str) -> Result<Self, Self::Error> {
+        // Parses the following formats:
+        //      8-4-4-4-12 format:
+        //          aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+        //
+        //      32-length hex string format:
+        //          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        //
+        //      32-length hex string format with 0x or 0X prefix:
+        //          0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        //          0Xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-                intval = intval << 4 | as_int;
-                consumed += 1;
+        if value.starts_with("0x") {
+            value = value.strip_prefix("0x").unwrap();
+        } else if value.starts_with("0X") {
+            value = value.strip_prefix("0X").unwrap();
+        }
 
-                if consumed == 32 {
-                    break;
-                }
-            }
+        let mut intval = 0u128;
+        let mut consumed = 0;
+
+        for (i, s) in value.chars().enumerate() {
+            let as_int: u128 = match (i, s) {
+                (_, '0') => 0,
+                (_, '1') => 1,
+                (_, '2') => 2,
+                (_, '3') => 3,
+                (_, '4') => 4,
+                (_, '5') => 5,
+                (_, '6') => 6,
+                (_, '7') => 7,
+                (_, '8') => 8,
+                (_, '9') => 9,
+                (_, 'a' | 'A') => 10,
+                (_, 'b' | 'B') => 11,
+                (_, 'c' | 'C') => 12,
+                (_, 'd' | 'D') => 13,
+                (_, 'e' | 'E') => 14,
+                (_, 'f' | 'F') => 15,
+
+                // Dashes are only allowed at these indices
+                (8 | 13 | 18 | 23, '-') => continue,
+                _ => return Err(()),
+            };
+
+            intval = intval << 4 | as_int;
+            consumed += 1;
 
             if consumed == 32 {
-                Ok(UUID(intval))
-            } else {
-                Err(())
+                break;
             }
         }
-    
-}
 
-pub fn v4() -> UUID {
-    let mut octets = [0u8; 16];
-    let mut rng = rand::thread_rng();
-    rng.fill_bytes(&mut octets);
-
-    octets[6] = (octets[6] & 0x0f) | 0x40;
-    octets[8] = (octets[8] & 0x3f) | 0x80;
-
-    UUID(u128::from_be_bytes(octets))
+        if consumed == 32 {
+            Ok(UUID(intval))
+        } else {
+            Err(())
+        }
+    }
 }
 
 #[non_exhaustive]
