@@ -5,6 +5,7 @@
 
 use rand::RngCore;
 use std::fmt::{Debug, Display};
+use std::iter::IntoIterator;
 
 /*
 pub fn v1() {}
@@ -14,29 +15,36 @@ pub fn v4() {}
 pub fn v5(namespace: UUID, name: &str) {}
 */
 
+trait OctetHex<'a>
+where
+    Self: 'a + IntoIterator<Item = &'a u8> + Sized
+{
+    fn output_hex(self, f: &mut std::fmt::Formatter<'_>)  -> std::fmt::Result {
+        for oct in self.into_iter() {
+            write!(f, "{:02x}", oct)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> OctetHex<'a> for &'a [u8] {}
+
 pub struct UUID(pub u128);
 
 impl Display for UUID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let octets = self.0.to_be_bytes();
 
-        let mut write_range = |f: &mut std::fmt::Formatter<'_>, a: usize, b: usize| {
-            for oct in &octets[a..=b] {
-                write!(f, "{:02x}", oct)?;
-            }
-
-            Ok(())
-        };
-
-        write_range(f, 0, 3)?;
+        octets[0..=3].output_hex(f)?;
         write!(f, "-")?;
-        write_range(f, 4, 5)?;
+        octets[4..=5].output_hex(f)?;
         write!(f, "-")?;
-        write_range(f, 6, 7)?;
+        octets[6..=7].output_hex(f)?;
         write!(f, "-")?;
-        write_range(f, 8, 9)?;
+        octets[8..=9].output_hex(f)?;
         write!(f, "-")?;
-        write_range(f, 10, 15)?;
+        octets[10..=15].output_hex(f)?;
 
         Ok(())
     }

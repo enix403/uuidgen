@@ -6,5 +6,7 @@
 fn main() {
     let value = uuidgen::v4();
 
-    println!("{:?}", value);
+    let output = format!("{}", value);
+
+    println!("{}", output);
 }
