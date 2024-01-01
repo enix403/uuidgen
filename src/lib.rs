@@ -4,9 +4,11 @@
 #![allow(dead_code)]
 
 use rand::RngCore;
+use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::iter::IntoIterator;
-use std::convert::AsRef;
+
+use md5::{Digest, Md5};
 
 trait OctetHex<'a>
 where
@@ -78,18 +80,42 @@ impl UUID {
         self.0
     }
 
+    #[inline(always)]
+    fn finalize_octets(mut octets: [u8; 16], version: u8) -> Self {
+        octets[6] = (octets[6] & 0x0f) | (version << 4);
+        octets[8] = (octets[8] & 0x3f) | 0x80;
+
+        UUID(u128::from_be_bytes(octets))
+    }
+
+    fn digest_based_uuid<D: Digest>(
+        mut hasher: D,
+        namespace: UUID,
+        name: &[u8],
+        version: u8,
+    ) -> Self {
+        hasher.update(namespace.0.to_be_bytes());
+        hasher.update(name);
+
+        let hash = hasher.finalize();
+        let hash = &hash[..];
+
+        let mut octets = [0u8; 16];
+
+        octets.copy_from_slice(&hash[0..=15]);
+        Self::finalize_octets(octets, version)
+    }
+
+    pub fn v3(namespace: UUID, name: &[u8]) -> Self {
+        Self::digest_based_uuid(<Md5 as Digest>::new(), namespace, name, 3)
+    }
+
     pub fn v4() -> UUID {
         let mut octets = [0u8; 16];
         let mut rng = rand::thread_rng();
         rng.fill_bytes(&mut octets);
 
-        // Set the version bits
-        octets[6] = (octets[6] & 0x0f) | 0x40;
-
-        // Set the reserved variant bits
-        octets[8] = (octets[8] & 0x3f) | 0x80;
-
-        UUID(u128::from_be_bytes(octets))
+        Self::finalize_octets(octets, 4)
     }
 
     pub fn parse<T: AsRef<str>>(value: T) -> Result<Self, ()> {
