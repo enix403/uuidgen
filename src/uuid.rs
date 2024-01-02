@@ -1,18 +1,4 @@
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-#![allow(unused_mut)]
-#![allow(dead_code)]
-
-use std::convert::AsRef;
 use std::fmt::{Debug, Display};
-use std::iter::IntoIterator;
-use std::collections::HashMap;
-
-use rand::RngCore;
-use digest::Digest;
-use md5::Md5;
-use sha1::Sha1;
-
 use phf::phf_map;
 
 trait OctetHex<'a>

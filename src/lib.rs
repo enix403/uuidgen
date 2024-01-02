@@ -1,8 +1,3 @@
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-#![allow(unused_mut)]
-#![allow(dead_code)]
-
 pub(crate) mod uuid;
 pub(crate) mod uuid_v4;
 pub(crate) mod hash_based;
