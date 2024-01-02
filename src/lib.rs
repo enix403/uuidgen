@@ -3,14 +3,17 @@
 #![allow(unused_mut)]
 #![allow(dead_code)]
 
-use rand::RngCore;
 use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::iter::IntoIterator;
+use std::collections::HashMap;
 
+use rand::RngCore;
 use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
+
+use phf::phf_map;
 
 trait OctetHex<'a>
 where
@@ -57,6 +60,33 @@ impl Debug for UUID {
         Ok(())
     }
 }
+
+static HEX_TO_INT_TBL: phf::Map<char, u8> = phf_map! {
+    '0' => 0,
+    '1' => 1,
+    '2' => 2,
+    '3' => 3,
+    '4' => 4,
+    '5' => 5,
+    '6' => 6,
+    '7' => 7,
+    '8' => 8,
+    '9' => 9,
+
+    'a' => 10,
+    'b' => 11,
+    'c' => 12,
+    'd' => 13,
+    'e' => 14,
+    'f' => 15,
+
+    'A' => 10,
+    'B' => 11,
+    'C' => 12,
+    'D' => 13,
+    'E' => 14,
+    'F' => 15,
+};
 
 impl UUID {
     pub const fn from_val(value: u128) -> Self {
@@ -149,27 +179,16 @@ impl UUID {
         let mut consumed = 0;
 
         for (i, s) in value.chars().enumerate() {
-            let as_int: u128 = match (i, s) {
-                (_, '0') => 0,
-                (_, '1') => 1,
-                (_, '2') => 2,
-                (_, '3') => 3,
-                (_, '4') => 4,
-                (_, '5') => 5,
-                (_, '6') => 6,
-                (_, '7') => 7,
-                (_, '8') => 8,
-                (_, '9') => 9,
-                (_, 'a' | 'A') => 10,
-                (_, 'b' | 'B') => 11,
-                (_, 'c' | 'C') => 12,
-                (_, 'd' | 'D') => 13,
-                (_, 'e' | 'E') => 14,
-                (_, 'f' | 'F') => 15,
 
+            let as_int: u128 = match (i, s) {
                 // Dashes are only allowed at these indices
                 (8 | 13 | 18 | 23, '-') => continue,
-                _ => return Err(()),
+
+                // Other characters
+                (_, s) => match HEX_TO_INT_TBL.get(&s) {
+                    Some(&val) => val as u128,
+                    None => return Err(())
+                }
             };
 
             intval = intval << 4 | as_int;
