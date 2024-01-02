@@ -59,7 +59,7 @@ impl Debug for UUID {
 }
 
 impl UUID {
-    pub fn from_val(value: u128) -> Self {
+    pub const fn from_val(value: u128) -> Self {
         Self(value)
     }
 
@@ -92,10 +92,11 @@ impl UUID {
 
     fn hash_based_uuid<D: Digest>(
         mut hasher: D,
-        namespace: UUID,
+        namespace: Option<UUID>,
         name: &[u8],
         version: u8,
     ) -> Self {
+        let namespace = namespace.unwrap_or_else(|| Self::v4());
         hasher.update(namespace.0.to_be_bytes());
         hasher.update(name);
 
@@ -108,7 +109,7 @@ impl UUID {
         Self::finalize_octets(octets, version)
     }
 
-    pub fn v3(namespace: UUID, name: &[u8]) -> Self {
+    pub fn v3(name: &[u8], namespace: Option<UUID>) -> Self {
         Self::hash_based_uuid(<Md5 as Digest>::new(), namespace, name, 3)
     }
 
@@ -120,7 +121,7 @@ impl UUID {
         Self::finalize_octets(octets, 4)
     }
 
-    pub fn v5(namespace: UUID, name: &[u8]) -> Self {
+    pub fn v5(name: &[u8], namespace: Option<UUID>) -> Self {
         Self::hash_based_uuid(<Sha1 as Digest>::new(), namespace, name, 5)
     }
 
@@ -203,12 +204,16 @@ impl TryFrom<String> for UUID {
     }
 }
 
-#[non_exhaustive]
-pub struct WellKnownUUID {}
-
 #[allow(non_upper_case_globals)]
-impl WellKnownUUID {
-    pub const Nil: UUID = UUID(0);
+pub mod wellknown {
+    use super::UUID;
+
+    pub const Nil: UUID = UUID::from_val(0);
+
+    pub const NS_DNS: UUID = UUID::from_val(143098242404177361603877621312831893704);
+    pub const NS_URL: UUID = UUID::from_val(143098242483405524118141958906375844040);
+    pub const NS_OID: UUID = UUID::from_val(143098242562633686632406296499919794376);
+    pub const NS_X500: UUID = UUID::from_val(143098242721090011660934971687007695048);
 }
 
 #[cfg(test)]
@@ -216,9 +221,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_v4_version() {
-        let uuid = UUID::v4();
-        assert_eq!(uuid.0.to_be_bytes()[6] & 0xf0, 0x40);
+    fn test_version_bits() {
+        let extver = move |uuid: UUID| (uuid.0.to_be_bytes()[6] & 0xf0) >> 4;
+
+        // Version 3
+        assert_eq!(extver(UUID::v3(b"some_random_name", None)), 0x3);
+        assert_eq!(
+            extver(UUID::v3(b"some_random_name", Some(wellknown::NS_URL))),
+            0x3
+        );
+
+        // Version 4
+        assert_eq!(extver(UUID::v4()), 0x4);
+
+        // Version 5
+        assert_eq!(extver(UUID::v5(b"another_random_name", None)), 0x5);
+        assert_eq!(
+            extver(UUID::v5(b"yet_another_random_name", Some(wellknown::NS_OID))),
+            0x5
+        );
     }
 
     #[test]
