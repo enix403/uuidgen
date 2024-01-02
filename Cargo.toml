@@ -10,11 +10,3 @@ digest = "0.10.7"
 md-5 = "0.10.6"
 rand = "0.8.5"
 sha1 = "0.10.6"
-
-# [lib]
-# name = "uuidgen"
-# path = "src/lib.rs"
-
-# [[bin]]
-# name = "uuidgen_bin"
-# path = "src/main.rs"

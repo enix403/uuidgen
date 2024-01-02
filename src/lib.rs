@@ -262,4 +262,16 @@ mod tests {
         assert_eq!(uuid, uuid.to_string_hex_joined().try_into().unwrap());
         assert_eq!(uuid, UUID::from_val(uuid.value()));
     }
+
+    #[test]
+    fn test_v3_output() {
+        let v3 = UUID::v3(b"barfoo", Some(wellknown::NS_X500));
+        assert_eq!(v3.to_string_hex(), "838ae739-5539-3a99-a67b-8e291e001842");
+    }
+
+    #[test]
+    fn test_v5_output() {
+        let v5 = UUID::v5(b"foobar", Some(wellknown::NS_DNS));
+        assert_eq!(v5.to_string_hex(), "a050b517-6677-5119-9a77-2d26bbf30507");
+    }
 }
