@@ -33,11 +33,11 @@ pub enum TimeUuidError {
 }
 
 impl TimeUuidGenerator {
-    pub fn new(node_id: u64) -> Self {
+    pub fn new(node_id: u64, clock_seq: u16) -> Self {
         Self {
             node_id,
             time_msec: None,
-            clock_seq: 0,
+            clock_seq,
             generated_count: 0,
         }
     }
@@ -78,32 +78,33 @@ impl TimeUuidGenerator {
         let ts = (msec + 12219292800000) * 10000 + self.generated_count as u64;
 
         // This stores the individual bytes of the timestamp with
-        // the least significant byte first
+        // the most significant byte first
         // 
-        // index 0 => byte 0 => bits 00 - 07
-        // index 1 => byte 1 => bits 08 - 15
-        // index 2 => byte 2 => bits 16 - 23
-        // index 3 => byte 3 => bits 24 - 31
-        // index 4 => byte 4 => bits 32 - 39
-        // index 5 => byte 5 => bits 40 - 47
-        // index 6 => byte 6 => bits 48 - 55
-        // index 7 => byte 7 => bits 56 - 63
-        let ts_bytes = ts.to_le_bytes();
+        // index 0 => byte 7 => bits 56 - 63
+        // index 1 => byte 6 => bits 48 - 55
+        //
+        // index 2 => byte 5 => bits 40 - 47
+        // index 3 => byte 4 => bits 32 - 39
+        //
+        // index 4 => byte 3 => bits 24 - 31
+        // index 5 => byte 2 => bits 16 - 23
+        // index 6 => byte 1 => bits 08 - 15
+        // index 7 => byte 0 => bits 00 - 07
+        let ts_bytes = ts.to_be_bytes();
 
         let mut octets = Octets::default();
 
         // Set the time_low field equal to the least significant 32
         // bits of the timestamp
-        octets[0..=3].copy_from_slice(&ts_bytes[0..=3]);
+        octets[0..=3].copy_from_slice(&ts_bytes[4..=7]);
 
         // Set the time_mid field equal to bits 32 through 47 of the timestamp
-        octets[4..=5].copy_from_slice(&ts_bytes[4..=5]);
+        octets[4..=5].copy_from_slice(&ts_bytes[2..=3]);
 
         // Set the 12 least significant bits (bits 0 through 11) of the
         // time_hi_and_version field equal to bits 48 through 59 from the
-        // timestamp. The most significant bits are ignored (actually overwritten,
-        // see below) after copying
-        octets[6..=7].copy_from_slice(&ts_bytes[6..=7]);
+        // timestamp. The remaining bits are overwritten later.
+        octets[6..=7].copy_from_slice(&ts_bytes[0..=1]);
 
         // Set the clock_seq_low field to the eight least significant bits
         // (bits zero through 7) of the clock sequence.
@@ -111,13 +112,21 @@ impl TimeUuidGenerator {
 
         // Set the 6 least significant bits (bits zero through 5) of the
         // clock_seq_hi_and_reserved field to the 6 most significant bits
-        // (bits 8 through 13) of the clock sequence.
+        // (bits 8 through 13) of the clock sequence. The remaining bits
+        // are overwritten later.
         octets[8] = ((self.clock_seq & 0x3f00) >> 8) as _;
 
         // Set the node field to the 48-bit IEEE address in the same order of
         // significance as the address.
-        octets[10..=15].copy_from_slice(&self.node_id.to_ne_bytes()[0..6]);
+        octets[10..=15].copy_from_slice(&self.node_id.to_be_bytes()[0..6]);
 
         Ok(Uuid::from_octets(octets, 0x01))
     }
 }
+
+/*
+
+let gen = UuidV1Generator {}
+gen.generate()
+
+*/
