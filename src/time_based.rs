@@ -54,7 +54,7 @@ pub struct TimeBasedState {
     generated_count: i32,
 }
 
-pub struct TimeBasedGenerator<const V: u8, P> {
+struct TimeBasedGenerator<const V: u8, P> {
     node_id_provider: P,
     state: TimeBasedState,
 }
@@ -68,7 +68,7 @@ impl<const V: u8, P> TimeBasedGenerator<V, P>
 where
     P: NodeIdProvider,
 {
-    pub fn new(node_id_provider: P) -> Self {
+    fn new(node_id_provider: P) -> Self {
         let node_id = node_id_provider.get_node_id();
         Self {
             node_id_provider,
@@ -81,7 +81,7 @@ where
         }
     }
 
-    pub fn generate(&mut self) -> Result<Uuid, Error> {
+    fn generate(&mut self) -> Result<Uuid, Error> {
         // Get the current timestamp
         let msec = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -179,11 +179,27 @@ where
     }
 }
 
-pub type V1Generator<P> = TimeBasedGenerator<1, P>;
+#[repr(transparent)]
+pub struct V1Generator<P>(TimeBasedGenerator<1, P>);
+
+impl<P> V1Generator<P>
+where
+    P: NodeIdProvider,
+{
+    #[inline(always)]
+    pub fn new(node_id_provider: P) -> Self {
+        Self(TimeBasedGenerator::new(node_id_provider))
+    }
+
+    #[inline(always)]
+    pub fn generate(&mut self) -> Result<Uuid, Error>  {
+        self.0.generate()
+    }
+}
 
 thread_local! {
     static GLOBAL_GENERATOR_V1: RefCell<V1Generator<RandomNodeIdProvider>> = RefCell::new(
-        TimeBasedGenerator::new(
+        V1Generator::new(
             RandomNodeIdProvider
         )
     );
