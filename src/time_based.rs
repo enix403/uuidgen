@@ -1,13 +1,8 @@
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-#![allow(unused_mut)]
-#![allow(unused_assignments)]
-#![allow(dead_code)]
-
 use core::num::NonZeroU64;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
+use rand::RngCore;
 
 use crate::uuid::{Octets, Uuid};
 
@@ -20,7 +15,7 @@ pub struct RandomNodeIdProvider;
 impl NodeIdProvider for RandomNodeIdProvider {
     fn get_node_id(&self) -> u64 {
         // Random...for now
-        0x11_F1_57_72_99_CB
+        0x1A_F1_57_72_99_CB
     }
 }
 
@@ -68,7 +63,7 @@ where
             state: TimeBasedState {
                 node_id,
                 time_msec: None,
-                clock_seq: 1234, // TODO: generate random
+                clock_seq: (rand::thread_rng().next_u32() & 0x0000ffff) as u16,
                 generated_count: 0,
             },
         }
@@ -96,10 +91,11 @@ where
         let last_msec = state.time_msec.map(|x| x.get()).unwrap_or(0);
         let mut clock_seq = state.clock_seq;
         let mut generated_count = state.generated_count;
-        // let old_node_id = state.node_id;
 
-        // TODO: If the node_id has changed, then randomize clock_seq.
-        // For this, provide a way to update node_id ?
+        // If the node_id has changed, then reset clock_seq with a random value.
+        if state.node_id != node_id {
+            clock_seq = (rand::thread_rng().next_u32() & 0x0000ffff) as u16;
+        }
 
         // Clock has regressed. Bump clock sequence
         if msec < last_msec {
