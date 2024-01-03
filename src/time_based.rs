@@ -11,6 +11,7 @@ pub trait NodeIdProvider {
     fn get_node_id(&self) -> u64;
 }
 
+#[derive(Clone, Copy)]
 pub struct RandomNodeIdProvider;
 
 impl NodeIdProvider for RandomNodeIdProvider {
@@ -19,6 +20,7 @@ impl NodeIdProvider for RandomNodeIdProvider {
     }
 }
 
+#[derive(Clone)]
 pub struct StaticNodeIdProvider(u64);
 
 impl StaticNodeIdProvider {
@@ -78,6 +80,13 @@ where
                 clock_seq: (rand::thread_rng().next_u32() & 0x0000ffff) as u16,
                 generated_count: 0,
             },
+        }
+    }
+
+    fn new_with_state(node_id_provider: P, state: TimeBasedState) -> Self {
+        Self {
+            node_id_provider,
+            state,
         }
     }
 
@@ -192,8 +201,17 @@ where
     }
 
     #[inline(always)]
-    pub fn generate(&mut self) -> Result<Uuid, Error>  {
+    pub fn generate(&mut self) -> Result<Uuid, Error> {
         self.0.generate()
+    }
+
+    #[allow(dead_code)]
+    #[inline(always)]
+    fn new_with_state(node_id_provider: P, state: TimeBasedState) -> Self {
+        Self(
+            //
+            TimeBasedGenerator::new_with_state(node_id_provider, state),
+        )
     }
 }
 
@@ -206,7 +224,43 @@ thread_local! {
 }
 
 pub fn v1() -> Result<Uuid, Error> {
-    GLOBAL_GENERATOR_V1.with(|generator| {
-        generator.borrow_mut().generate()
-    })
+    GLOBAL_GENERATOR_V1.with(|generator| generator.borrow_mut().generate())
+}
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn v1_apple_test() {
+        /*
+            *Reference UUID*
+
+            Standard String Format  d71c7cd2-aa3b-11ee-ac4a-325096b39f47
+            Single Integer Value    285931935115184731626516849736750964551
+            Version                 1 (time and node based)
+            Variant                 DCE 1.1, ISO/IEC 11578:1996
+            Contents - Time         2024-01-03 13:27:28.382485.0 UTC
+            Contents - Clock        11338 (usually random)
+            Contents - Node         32:50:96:b3:9f:47 (local unicast)
+        */
+
+        let node_id_provider = StaticNodeIdProvider(0x_32_50_96_B3_9F_47);
+
+        let state = TimeBasedState {
+            node_id: node_id_provider.0,
+            time_msec: Some(NonZeroU64::new(1704288448382).unwrap()),
+            clock_seq: 11338,
+            generated_count: 48500,
+        };
+
+        let mut generator = V1Generator::new_with_state(node_id_provider, state);
+
+        let value = generator.generate().unwrap();
+
+        // println!("{value}");
+
+        assert_ne!(value.to_string_hex(), "this_will_fail");
+    }
 }

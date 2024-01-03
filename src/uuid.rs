@@ -196,8 +196,11 @@ mod tests {
     fn test_version_bits() {
         let extver = move |uuid: Uuid| (uuid.0.to_be_bytes()[6] & 0xf0) >> 4;
 
+        // Version 1
+        assert_eq!(extver(crate::gen::v1().expect("Failed to generate v1 UUID")), 0x01);
+
         // Version 3
-        assert_eq!(extver(crate::gen::v3(b"some_random_name", None)), 0x3);
+        assert_eq!(extver(crate::gen::v3(b"some_random_name", None)), 0x03);
         assert_eq!(
             extver(crate::gen::v3(b"some_random_name", Some(wellknown::NS_URL))),
             0x3
