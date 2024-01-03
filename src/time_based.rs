@@ -7,7 +7,9 @@
 use core::num::NonZeroU64;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::uuid::{Uuid, Octets};
+use thiserror::Error;
+
+use crate::uuid::{Octets, Uuid};
 
 pub struct TimeUuidGenerator {
     // 48-bits MAC address
@@ -24,6 +26,12 @@ pub struct TimeUuidGenerator {
     generated_count: i32,
 }
 
+#[derive(Error, Debug)]
+pub enum TimeUuidError {
+    #[error("Too many UUIDs generated in a single time interval")]
+    TooManyGenerated,
+}
+
 impl TimeUuidGenerator {
     pub fn new(node_id: u64) -> Self {
         Self {
@@ -34,14 +42,17 @@ impl TimeUuidGenerator {
         }
     }
 
-    pub fn generate(&mut self) -> Option<Uuid> {
+    pub fn generate(&mut self) -> Result<Uuid, TimeUuidError> {
         let last_msec = self.time_msec.map(|x| x.get()).unwrap_or(0);
 
         // Get the current timestamp
-        let now = SystemTime::now();
-        let msec = now.duration_since(UNIX_EPOCH).unwrap().as_millis() as _;
+        let msec = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as _;
 
-        // TODO: if the node_id has changed, then randomize clock_seq.
+        // TODO: If the node_id has changed, then randomize clock_seq.
+        // For this, provide a way to update node_id ?
 
         // Clock has regressed. Bump clock sequence
         if msec < last_msec {
@@ -57,7 +68,7 @@ impl TimeUuidGenerator {
 
         // Reject if too many UUIDs are generated in a single time interval.
         if self.generated_count >= 10000 {
-            return None;
+            return Err(TimeUuidError::TooManyGenerated);
         }
 
         // Update the last generated timestamp
@@ -65,7 +76,6 @@ impl TimeUuidGenerator {
 
         // Convert to 100-nanoseconds since 1582-10-15T00:00:00Z
         let ts = (msec + 12219292800000) * 10000 + self.generated_count as u64;
-
 
         // This stores the individual bytes of the timestamp with
         // the least significant byte first
@@ -102,12 +112,12 @@ impl TimeUuidGenerator {
         // Set the 6 least significant bits (bits zero through 5) of the
         // clock_seq_hi_and_reserved field to the 6 most significant bits
         // (bits 8 through 13) of the clock sequence.
-        octets[8] = ((self.clock_seq & 0xff00) >> 8) as _;
+        octets[8] = ((self.clock_seq & 0x3f00) >> 8) as _;
 
         // Set the node field to the 48-bit IEEE address in the same order of
         // significance as the address.
-        octets[10..=15].copy_from_slice(self.node_id.to_ne_bytes().as_slice());
+        octets[10..=15].copy_from_slice(&self.node_id.to_ne_bytes()[0..6]);
 
-        Some(Uuid::from_octets(octets, 0x10))
+        Ok(Uuid::from_octets(octets, 0x01))
     }
 }
