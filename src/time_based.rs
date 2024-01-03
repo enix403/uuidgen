@@ -54,8 +54,7 @@ pub struct TimeBasedState {
     generated_count: i32,
 }
 
-pub struct TimeBasedGenerator<P> {
-    version: u8,
+pub struct TimeBasedGenerator<const V: u8, P> {
     node_id_provider: P,
     state: TimeBasedState,
 }
@@ -65,14 +64,13 @@ struct TimeUuidTick {
     next_state: TimeBasedState,
 }
 
-impl<P> TimeBasedGenerator<P>
+impl<const V: u8, P> TimeBasedGenerator<V, P>
 where
     P: NodeIdProvider,
 {
-    pub fn new(version: u8, node_id_provider: P) -> Self {
+    pub fn new(node_id_provider: P) -> Self {
         let node_id = node_id_provider.get_node_id();
         Self {
-            version,
             node_id_provider,
             state: TimeBasedState {
                 node_id,
@@ -93,7 +91,7 @@ where
         let tick = Self::tick(&self.state, self.node_id_provider.get_node_id(), msec)?;
         self.state = tick.next_state;
 
-        Ok(Uuid::from_octets(tick.octets, self.version))
+        Ok(Uuid::from_octets(tick.octets, V))
     }
 
     fn tick(state: &TimeBasedState, node_id: u64, msec: u64) -> Result<TimeUuidTick, Error> {
@@ -181,10 +179,11 @@ where
     }
 }
 
+pub type V1Generator<P> = TimeBasedGenerator<1, P>;
+
 thread_local! {
-    static GLOBAL_GENERATOR_V1: RefCell<TimeBasedGenerator<RandomNodeIdProvider>> = RefCell::new(
+    static GLOBAL_GENERATOR_V1: RefCell<V1Generator<RandomNodeIdProvider>> = RefCell::new(
         TimeBasedGenerator::new(
-            1,
             RandomNodeIdProvider
         )
     );
