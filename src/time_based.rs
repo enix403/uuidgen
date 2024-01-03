@@ -1,7 +1,8 @@
+use core::cell::RefCell;
 use core::num::NonZeroU64;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use thiserror::Error;
 use rand::RngCore;
 
 use crate::uuid::{Octets, Uuid};
@@ -14,13 +15,26 @@ pub struct RandomNodeIdProvider;
 
 impl NodeIdProvider for RandomNodeIdProvider {
     fn get_node_id(&self) -> u64 {
-        // Random...for now
-        0x1A_F1_57_72_99_CB
+        rand::thread_rng().next_u64()
     }
 }
 
-#[derive(Error, Debug)]
-pub enum TimeUuidError {
+pub struct StaticNodeIdProvider(u64);
+
+impl StaticNodeIdProvider {
+    pub fn new(node_id: u64) -> Self {
+        Self(node_id)
+    }
+}
+
+impl NodeIdProvider for StaticNodeIdProvider {
+    fn get_node_id(&self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
     #[error("Too many UUIDs generated in a single time interval")]
     TooManyGenerated,
 }
@@ -69,7 +83,7 @@ where
         }
     }
 
-    pub fn generate(&mut self) -> Result<Uuid, TimeUuidError> {
+    pub fn generate(&mut self) -> Result<Uuid, Error> {
         // Get the current timestamp
         let msec = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -82,12 +96,7 @@ where
         Ok(Uuid::from_octets(tick.octets, self.version))
     }
 
-    fn tick(
-        state: &TimeBasedState,
-        node_id: u64,
-        msec: u64,
-    ) -> Result<TimeUuidTick, TimeUuidError> {
-
+    fn tick(state: &TimeBasedState, node_id: u64, msec: u64) -> Result<TimeUuidTick, Error> {
         let last_msec = state.time_msec.map(|x| x.get()).unwrap_or(0);
         let mut clock_seq = state.clock_seq;
         let mut generated_count = state.generated_count;
@@ -111,7 +120,7 @@ where
 
         // Reject if too many UUIDs are generated in a single time interval.
         if generated_count >= 10000 {
-            return Err(TimeUuidError::TooManyGenerated);
+            return Err(Error::TooManyGenerated);
         }
 
         // Convert to 100-nanoseconds since 1582-10-15T00:00:00Z
@@ -170,4 +179,19 @@ where
             },
         })
     }
+}
+
+thread_local! {
+    static GLOBAL_GENERATOR_V1: RefCell<TimeBasedGenerator<RandomNodeIdProvider>> = RefCell::new(
+        TimeBasedGenerator::new(
+            1,
+            RandomNodeIdProvider
+        )
+    );
+}
+
+pub fn v1() -> Result<Uuid, Error> {
+    GLOBAL_GENERATOR_V1.with(|generator| {
+        generator.borrow_mut().generate()
+    })
 }
