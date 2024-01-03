@@ -1,6 +1,4 @@
 use core::cell::RefCell;
-use core::num::NonZeroU64;
-
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::RngCore;
@@ -16,7 +14,10 @@ pub struct RandomNodeIdProvider;
 
 impl NodeIdProvider for RandomNodeIdProvider {
     fn get_node_id(&self) -> u64 {
-        rand::thread_rng().next_u64()
+        // Per Section 4.5:
+        // For a randomly generated node id, the least significant bit of the first octet
+        // must be set to one
+        rand::thread_rng().next_u64() | 0x01_00_00_00_00_00_00_00
     }
 }
 
@@ -46,7 +47,7 @@ pub struct TimeBasedState {
     node_id: u64,
 
     // Unix timestamp in milliseconds of last generated UUID
-    time_msec: Option<NonZeroU64>,
+    time_msec: u64,
 
     // Clock Sequence: a 14-bit counter as per RFC
     clock_seq: u16,
@@ -65,13 +66,20 @@ impl<const V: u8, P> TimeBasedGenerator<V, P>
 where
     P: NodeIdProvider,
 {
+    fn get_time_milli() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+    }
+
     fn new(node_id_provider: P) -> Self {
         let node_id = node_id_provider.get_node_id();
         Self {
             node_id_provider,
             state: TimeBasedState {
                 node_id,
-                time_msec: None,
+                time_msec: Self::get_time_milli(),
                 clock_seq: (rand::thread_rng().next_u32() & 0x0000ffff) as u16,
                 generated_count: 0,
             },
@@ -87,10 +95,7 @@ where
 
     fn generate(&mut self) -> Result<Uuid, Error> {
         // Get the current timestamp
-        let msec = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let msec = Self::get_time_milli();
 
         let octets = Self::layout_octets(&self.state);
 
@@ -101,11 +106,8 @@ where
     }
 
     fn layout_octets(state: &TimeBasedState) -> Octets {
-        let msec = state.time_msec.map(|x| x.get()).unwrap_or(0);
-
         // Convert to 100-nanoseconds since 1582-10-15T00:00:00Z
-        let ts = (msec + 12219292800000) * 10000
-            + state.generated_count as u64;
+        let ts = (state.time_msec + 12219292800000) * 10000 + state.generated_count as u64;
 
         // This stores the individual bytes of the timestamp with
         // the most significant byte first
@@ -154,7 +156,7 @@ where
     }
 
     fn tick(state: &TimeBasedState, node_id: u64, msec: u64) -> Result<TimeBasedState, Error> {
-        let last_msec = state.time_msec.map(|x| x.get()).unwrap_or(0);
+        let last_msec = state.time_msec;
         let mut clock_seq = state.clock_seq;
         let mut generated_count = state.generated_count;
 
@@ -182,7 +184,7 @@ where
 
         Ok(TimeBasedState {
             node_id,
-            time_msec: NonZeroU64::new(msec),
+            time_msec: msec,
             clock_seq,
             generated_count,
         })
@@ -235,30 +237,27 @@ mod tests {
 
     #[test]
     fn v1_apple_test() {
-        /*
-         ** *Sample Reference UUID*
-         **   
-         ** Standard String Format  d71c7cd2-aa3b-11ee-ac4a-325096b39f47
-         ** Single Integer Value    285931935115184731626516849736750964551
-         ** Version                 1 (time and node based)
-         ** Variant                 DCE 1.1, ISO/IEC 11578:1996
-         ** Contents - Time         2024-01-03 13:27:28.382485.0 UTC
-         ** Contents - Clock        11338 (usually random)
-         ** Contents - Node         32:50:96:b3:9f:47 (local unicast)
-         ** 
-         ** Also the UUID with the same state values but in the next 100-nanosecond interval
-         ** will be: d71c7cd3-aa3b-11ee-ac4a-325096b39f47
-        */
+        // *Reference UUID to test with*
+        //
+        // Standard String Format  d71c7cd2-aa3b-11ee-ac4a-325096b39f47
+        // Single Integer Value    285931935115184731626516849736750964551
+        // Version                 1 (time and node based)
+        // Variant                 DCE 1.1, ISO/IEC 11578:1996
+        // Contents - Time         2024-01-03 13:27:28.382485.0 UTC
+        // Contents - Clock        11338
+        // Contents - Node         32:50:96:b3:9f:47 (local unicast)
 
         let node_id: u64 = 0x_32_50_96_B3_9F_47;
         let clock_seq: u16 = 11338;
+
+        let time_msec = 1704288448382; // Time in milliseconds resolution
         let num_100_nanosecs = 4850;
 
         let node_id_provider = StaticNodeIdProvider(node_id);
 
         let state = TimeBasedState {
             node_id,
-            time_msec: Some(NonZeroU64::new(1704288448382).unwrap()),
+            time_msec,
             clock_seq,
             generated_count: num_100_nanosecs,
         };
@@ -266,6 +265,9 @@ mod tests {
         let mut generator = V1Generator::new_with_state(node_id_provider, state);
 
         let value = generator.generate().unwrap();
-        assert_eq!(value.to_string_hex(), "d71c7cd2-aa3b-11ee-ac4a-325096b39f47");
+        assert_eq!(
+            value.to_string_hex(),
+            "d71c7cd2-aa3b-11ee-ac4a-325096b39f47"
+        );
     }
 }
