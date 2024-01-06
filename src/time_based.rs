@@ -1,5 +1,4 @@
 use core::cell::RefCell;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::RngCore;
 
@@ -67,6 +66,12 @@ where
     P: NodeIdProvider,
 {
     fn get_time_milli() -> u64 {
+        #[cfg(feature = "webtime")]
+        use web_time::{SystemTime, UNIX_EPOCH};
+
+        #[cfg(not(feature = "webtime"))]
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
