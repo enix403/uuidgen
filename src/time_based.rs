@@ -236,7 +236,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn v1_apple_test() {
+    fn test_output() {
         // *Reference UUID to test with*
         //
         // Standard String Format  d71c7cd2-aa3b-11ee-ac4a-325096b39f47

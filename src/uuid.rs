@@ -1,11 +1,11 @@
-use std::fmt::{Debug, Display};
+use core::fmt::{Debug, Display};
 use phf::phf_map;
 
 trait OctetHex<'a>
 where
     Self: 'a + IntoIterator<Item = &'a u8> + Sized,
 {
-    fn output_hex(self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn output_hex(self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for oct in self.into_iter() {
             write!(f, "{:02x}", oct)?;
         }
@@ -20,7 +20,7 @@ impl<'a> OctetHex<'a> for &'a [u8] {}
 pub struct Uuid(u128);
 
 impl Display for Uuid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let octets = self.0.to_be_bytes();
 
         octets[0..=3].output_hex(f)?;
@@ -38,7 +38,7 @@ impl Display for Uuid {
 }
 
 impl Debug for Uuid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "Uuid(")?;
         <Self as Display>::fmt(self, f)?;
         write!(f, ")")?;
