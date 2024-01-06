@@ -2,6 +2,7 @@ pub(crate) mod uuid;
 pub(crate) mod uuid_v4;
 pub(crate) mod hash_based;
 pub mod time_based;
+pub mod inspect;
 
 pub mod gen {
     pub use crate::time_based::v1;
