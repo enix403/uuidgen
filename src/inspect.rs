@@ -29,11 +29,26 @@ pub struct UuidFields {
     pub node_id: u64,
 }
 
+/// The time information returned by `UuidFields::unix_time()` method
+///
+/// UUIDs contain a timestamp with resolution upto nanoseconds, which sometimes doesn't fit
+/// in a single 64-bit integer. This struct contains the timestamp in a destructed way in multiple
+/// integers, namely `seconds`, `microseconds` and `hecto_nanoseconds`. `seconds` stores the number of
+/// seconds in the timestamp. `microseconds` stores the additional microseconds, after one has taken
+/// `seconds` into the account. Similarly, `hecto_nanoseconds` contains the additional 100-nanoseconds
+/// intervals, after one taken into account `microseconds`.
+///
+/// 'Hecto' is a standard SI prefix meaning 100 
 #[derive(Clone, Default, Debug)]
 pub struct TimeSpec {
-    seconds: u64,
-    microseconds: i32,
-    nanoseconds: i8,
+    /// Seconds of the timestamp
+    pub seconds: u64,
+
+    /// Microseconds of the timestamp
+    pub microseconds: i32,
+
+    /// 100-nanoseconds of the timestamp.
+    pub hecto_nanoseconds: i8,
 }
 
 impl UuidFields {
@@ -121,7 +136,7 @@ impl UuidFields {
 
         let mut timespec = TimeSpec::default();
 
-        timespec.nanoseconds = time.divn_mod(10);
+        timespec.hecto_nanoseconds = time.divn_mod(10);
         timespec.microseconds = time.divn_mod(1000000);
         timespec.seconds = time.remaining();
 
