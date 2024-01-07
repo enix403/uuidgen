@@ -6,19 +6,19 @@ use crate::uuid::Uuid;
 #[derive(Debug)]
 pub struct UuidFields {
     /// Number of milliseconds since the *Unix epoch* (January 1st, 1970)
-    time: u64,
+    pub time: u64,
 
     /// The 4-bit version field of the UUID
-    version: u8,
+    pub version: u8,
 
     /// The 3-bit variant field of the UUID
-    variant: u8,
+    pub variant: u8,
 
     /// Clock sequence of the UUID
-    clock_seq: u16,
+    pub clock_seq: u16,
 
     /// The 48-bit node field of the UUID
-    node_id: u64
+    pub node_id: u64
 }
 
 impl UuidFields {
@@ -33,39 +33,63 @@ impl UuidFields {
         let clk_seq_low = octets[9];
 
         let node_id = u64::from_be_bytes({
-            let mut bytes = [0u8; 8];
+            let mut bytes = [0; 8];
             bytes[2..8].copy_from_slice(&octets[10..=15]);
             bytes
         });
 
+        /* ========================= */
+        /* Parse/Assemble the fields */
+        /* ========================= */
+
         let version = ((time_hi_and_version & 0xf000) >> 12) as u8;
-        let variant = ((clk_seq_hi_res & 0xe0) >> 5) as u8;
-
-
-        let clock_seq = ((clk_seq_hi_res as u16) << 8) | clk_seq_low as u16;
-        let clock_seq = clock_seq & 0x1fff;
 
         let time_epoch_millisecs = {
-            // remove the version bits from timestamp
+            // Remove the version bits from timestamp
             let time_hi_and_version = (time_hi_and_version & 0x0fff) as u64;
             let time_mid = time_mid as u64;
             let time_low = time_low as u64;
 
-            // Combine the 3 fields into full timestamp
+            // Combine the 3 fields into full timestamp. This will represent the
+            // count of 100-nanosecond intervals since 00:00:00.00, 15 October 1582
             let uuidtime = time_hi_and_version << 48 | time_mid << 32 | time_low;
 
             // Convert to milliseconds
             let time_milli = uuidtime / 10000;
 
-            // Convert milliseconds
+            // Convert to milliseconds since Unix Epoch (00:00:00.00, 1 January 1970)
             time_milli - 12219292800000
         };
 
-        // println!("time_epoch = {}", time_epoch_millisecs);
-        // println!("version = {}", version);
-        // println!("variant = {:0b}", variant);
-        // println!("clock_seq = {}", clock_seq);
-        // println!("node_id = {:#018x}", node_id);
+        // The clk_seq_hi_res field contains both the variant the high byte of clock
+        // sequence, but the two fields are encoded as variable number of bits, as shown
+        // in the table below.
+        //
+        // Bits labelled 0 or 1 contitute the variant part, while the remaining bits (Y)
+        // make up the clock sequence.
+        //
+        // Bit 7 6 5 4 3 2 1 0    Variant
+        //     0 Y Y Y Y Y Y Y => Reserved, NCS backward compatibility.
+        //     1 0 Y Y Y Y Y Y => The variant specified in RFC 4122.
+        //     1 1 0 Y Y Y Y Y => Reserved, Microsoft Corporation backward compatibility
+        //     1 1 1 Y Y Y Y Y => Reserved for future definition.
+        let vmask = match clk_seq_hi_res {
+            // Check if bit 7 is 0
+            // In this case only bit 7 constitutes variant
+            x if x < 0b_1000_0000 => 0x80,
+
+            // Otherwise check if bit 6 is 0
+            // In this case bit 7 and 6 constitute variant
+            x if x < 0b_1100_0000 => 0xC0,
+
+            // Otherwise bit 7, 6 and 5 constitute variant
+            _ => 0xE0
+        };
+
+        let variant = clk_seq_hi_res & vmask;
+        let clk_seq_hi = clk_seq_hi_res & !vmask;
+
+        let clock_seq = ((clk_seq_hi as u16) << 8) | clk_seq_low as u16;
 
         Self {
             time: time_epoch_millisecs,
