@@ -110,10 +110,12 @@ impl Uuid {
         self.0
     }
 
+    #[inline]
     pub fn fields(&self) -> UuidFields {
         UuidFields::of(self)
     }
 
+    #[inline]
     pub fn details(&self) -> UuidDetails {
         UuidDetails::construct(&self.fields())
     }

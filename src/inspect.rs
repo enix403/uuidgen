@@ -73,12 +73,13 @@ pub struct UuidDetails {
 ///
 /// UUIDs contain a timestamp with resolution upto nanoseconds, which sometimes doesn't fit
 /// in a single 64-bit integer. This struct contains the timestamp in a destructed way in multiple
-/// integers, namely `seconds`, `microseconds` and `hecto_nanoseconds`. `seconds` stores the number of
+/// integers, namely `seconds`, `microseconds` and `nanoseconds`. `seconds` stores the number of
 /// seconds in the timestamp. `microseconds` stores the additional microseconds, after one has taken
-/// `seconds` into the account. Similarly, `hecto_nanoseconds` contains the additional 100-nanoseconds
-/// intervals, after one taken into account `microseconds`.
+/// `seconds` into the account. Similarly, `nanoseconds` contains the additional nanoseconds,
+/// after one taken into account `microseconds`.
 ///
-/// 'Hecto' is a standard SI prefix meaning 100 
+/// As an example, the full timestamp as a single number in nanoseconds is given by
+/// `seconds * 1_000_000_000 + microseconds * 1000 + nanoseconds`
 #[derive(Clone, Debug)]
 pub struct TimeSpec {
     /// Seconds of the timestamp
@@ -87,8 +88,8 @@ pub struct TimeSpec {
     /// Microseconds of the timestamp
     pub microseconds: i32,
 
-    /// 100-nanoseconds of the timestamp.
-    pub hecto_nanoseconds: i8,
+    /// nanoseconds of the timestamp.
+    pub nanoseconds: i32,
 }
 
 impl TimeSpec {
@@ -96,7 +97,7 @@ impl TimeSpec {
         Self {
             seconds: 0,
             microseconds: 0,
-            hecto_nanoseconds: 0
+            nanoseconds: 0
         }
     }
 }
@@ -169,7 +170,7 @@ impl UuidDetails {
 
         let mut timespec = TimeSpec::zero();
 
-        timespec.hecto_nanoseconds = time.divn_mod(10);
+        timespec.nanoseconds = time.divn_mod(10) * 100;
         timespec.microseconds = time.divn_mod(1000000);
         timespec.seconds = time.remaining();
 
