@@ -5,16 +5,20 @@ use crate::uuid::Uuid;
 
 #[derive(Debug)]
 pub struct UuidFields {
-    /// Number of milliseconds since the *Unix epoch* (January 1st, 1970)
+    /// The 60-bit field of the UUID. This is the number of 100-nanosecond intervals
+    /// since 00:00:00.00, 15 October 1582
     pub time: u64,
 
     /// The 4-bit version field of the UUID
     pub version: u8,
 
-    /// The 3-bit variant field of the UUID
+    /// The 8-bit variant field of the UUID.
+    /// 
+    /// UUID variant is encoded in a variable number of bits. For this reason this contains 
+    /// the full octet containing the variant, but with all the clock sequence bits set to 0
     pub variant: u8,
 
-    /// Clock sequence of the UUID
+    /// The 14-bit clock sequence of the UUID
     pub clock_seq: u16,
 
     /// The 48-bit node field of the UUID
@@ -54,11 +58,7 @@ impl UuidFields {
             // count of 100-nanosecond intervals since 00:00:00.00, 15 October 1582
             let uuidtime = time_hi_and_version << 48 | time_mid << 32 | time_low;
 
-            // Convert to milliseconds
-            let time_milli = uuidtime / 10000;
-
-            // Convert to milliseconds since Unix Epoch (00:00:00.00, 1 January 1970)
-            time_milli.wrapping_sub(12219292800000)
+            uuidtime
         };
 
         // The clk_seq_hi_res field contains both the variant the high byte of clock
@@ -99,4 +99,13 @@ impl UuidFields {
             node_id,
         }
     }
-}
+
+    /// Returns the timestamp of the UUID as unix time in nanoseconds
+    /// i.e the number of nanoseconds elapsed since 00:00:00 January 1st, 1970
+    pub fn unix_time_ns(&self) -> u64 {
+        // A single 100-nanoseconds interval contains, well, 100 nanoseconds.
+        let nanosecs = self.time.saturating_mul(100);
+
+        nanosecs.saturating_sub(crate::constants::NANOSECS_GREGORIAN_UNIX)
+    }
+ }

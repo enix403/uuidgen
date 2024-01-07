@@ -112,7 +112,8 @@ where
 
     fn layout_octets(state: &TimeBasedState) -> Octets {
         // Convert to 100-nanoseconds since 1582-10-15T00:00:00Z
-        let ts = (state.time_msec + 12219292800000) * 10000 + state.generated_count as u64;
+        let ts = (state.time_msec + crate::constants::MILLISECS_GREGORIAN_UNIX) * 10000
+            + state.generated_count as u64;
 
         // This stores the individual bytes of the timestamp with
         // the most significant byte first
