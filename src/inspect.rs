@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use num_traits::Num;
+use num_traits::cast::FromPrimitive;
+use num_traits::cast::ToPrimitive;
+
 use crate::uuid::Uuid;
 
 #[derive(Debug)]
@@ -13,8 +17,8 @@ pub struct UuidFields {
     pub version: u8,
 
     /// The 8-bit variant field of the UUID.
-    /// 
-    /// UUID variant is encoded in a variable number of bits. For this reason this contains 
+    ///
+    /// UUID variant is encoded in a variable number of bits. For this reason this contains
     /// the full octet containing the variant, but with all the clock sequence bits set to 0
     pub variant: u8,
 
@@ -22,7 +26,14 @@ pub struct UuidFields {
     pub clock_seq: u16,
 
     /// The 48-bit node field of the UUID
-    pub node_id: u64
+    pub node_id: u64,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct TimeSpec {
+    seconds: u64,
+    microseconds: i32,
+    nanoseconds: i8,
 }
 
 impl UuidFields {
@@ -83,7 +94,7 @@ impl UuidFields {
             x if x < 0b_1100_0000 => 0xC0,
 
             // Otherwise bit 7, 6 and 5 constitute variant
-            _ => 0xE0
+            _ => 0xE0,
         };
 
         let variant = clk_seq_hi_res & vmask;
@@ -102,10 +113,36 @@ impl UuidFields {
 
     /// Returns the timestamp of the UUID as unix time in nanoseconds
     /// i.e the number of nanoseconds elapsed since 00:00:00 January 1st, 1970
-    pub fn unix_time_ns(&self) -> u64 {
-        // A single 100-nanoseconds interval contains, well, 100 nanoseconds.
-        let nanosecs = self.time.saturating_mul(100);
+    pub fn unix_time(&self) -> TimeSpec {
+        // The offset in 100-nanosecond intervals
+        let offset = crate::constants::MILLISECS_GREGORIAN_UNIX * 10000;
 
-        nanosecs.saturating_sub(crate::constants::NANOSECS_GREGORIAN_UNIX)
+        let mut time = ConsumingU64(self.time.saturating_sub(offset));
+
+        let mut timespec = TimeSpec::default();
+
+        timespec.nanoseconds = time.divn_mod(10);
+        timespec.microseconds = time.divn_mod(1000000);
+        timespec.seconds = time.remaining();
+
+        timespec
     }
- }
+}
+
+struct ConsumingU64(u64);
+
+impl ConsumingU64 {
+    fn divn_mod<T>(&mut self, n: T) -> T
+    where
+        T: Num + ToPrimitive + FromPrimitive,
+    {
+        let n = n.to_u64().unwrap();
+        let rem = self.0 % n;
+        self.0 /= n;
+        T::from_u64(rem).unwrap()
+    }
+
+    fn remaining(self) -> u64 {
+        self.0
+    }
+}

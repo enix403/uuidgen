@@ -13,6 +13,7 @@ sha1 = "0.10.6"
 phf = { version = "0.11.2", default-features = false, features = ['macros'] }
 thiserror = "1.0.56"
 web-time = { version = "0.2.4", optional = true }
+num-traits = "0.2.17"
 
 [features]
 webtime = ["dep:web-time"]
