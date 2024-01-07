@@ -58,7 +58,7 @@ impl UuidFields {
             let time_milli = uuidtime / 10000;
 
             // Convert to milliseconds since Unix Epoch (00:00:00.00, 1 January 1970)
-            time_milli - 12219292800000
+            time_milli.wrapping_sub(12219292800000)
         };
 
         // The clk_seq_hi_res field contains both the variant the high byte of clock
