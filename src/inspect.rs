@@ -7,8 +7,48 @@ use num_traits::cast::ToPrimitive;
 
 use crate::uuid::Uuid;
 
-#[derive(Debug)]
+/// The individual fields of a UUID as per RFC 4122. Each field is stored in
+/// Big-Endian order
+#[derive(Clone, Debug)]
 pub struct UuidFields {
+    time_low: u32,
+    time_mid: u16,
+    time_hi_and_version: u16,
+    clk_seq_hi_res: u8,
+    clk_seq_low: u8,
+    node: u64,
+}
+
+impl UuidFields {
+    pub fn of(uuid: &Uuid) -> Self {
+        let octets = uuid.value().to_be_bytes();
+
+        // Fields of the UUID as per RFC section 4.1.2
+        let time_low = u32::from_be_bytes(octets[00..=03].try_into().unwrap());
+        let time_mid = ((octets[4] as u16) << 8) | octets[5] as u16;
+        let time_hi_and_version = ((octets[6] as u16) << 8) | octets[7] as u16;
+        let clk_seq_hi_res = octets[8];
+        let clk_seq_low = octets[9];
+
+        let node = u64::from_be_bytes({
+            let mut bytes = [0; 8];
+            bytes[2..8].copy_from_slice(&octets[10..=15]);
+            bytes
+        });
+
+        Self {
+            time_low,
+            time_mid,
+            time_hi_and_version,
+            clk_seq_hi_res,
+            clk_seq_low,
+            node,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct UuidDetails {
     /// The 60-bit field of the UUID. This is the number of 100-nanosecond intervals
     /// since 00:00:00.00, 15 October 1582
     pub time: u64,
@@ -26,7 +66,7 @@ pub struct UuidFields {
     pub clock_seq: u16,
 
     /// The 48-bit node field of the UUID
-    pub node_id: u64,
+    pub node: u64,
 }
 
 /// The time information returned by `UuidFields::unix_time()` method
@@ -39,7 +79,7 @@ pub struct UuidFields {
 /// intervals, after one taken into account `microseconds`.
 ///
 /// 'Hecto' is a standard SI prefix meaning 100 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct TimeSpec {
     /// Seconds of the timestamp
     pub seconds: u64,
@@ -51,34 +91,26 @@ pub struct TimeSpec {
     pub hecto_nanoseconds: i8,
 }
 
-impl UuidFields {
-    pub fn new(uuid: Uuid) -> Self {
-        let octets = uuid.value().to_be_bytes();
+impl TimeSpec {
+    fn zero() -> Self {
+        Self {
+            seconds: 0,
+            microseconds: 0,
+            hecto_nanoseconds: 0
+        }
+    }
+}
 
-        // Fields of the UUID as per RFC section 4.1.2
-        let time_low = u32::from_be_bytes(octets[00..=03].try_into().unwrap());
-        let time_mid = ((octets[4] as u16) << 8) | octets[5] as u16;
-        let time_hi_and_version = ((octets[6] as u16) << 8) | octets[7] as u16;
-        let clk_seq_hi_res = octets[8];
-        let clk_seq_low = octets[9];
+impl UuidDetails {
+    pub fn construct(fields: &UuidFields) -> Self {
 
-        let node_id = u64::from_be_bytes({
-            let mut bytes = [0; 8];
-            bytes[2..8].copy_from_slice(&octets[10..=15]);
-            bytes
-        });
-
-        /* ========================= */
-        /* Parse/Assemble the fields */
-        /* ========================= */
-
-        let version = ((time_hi_and_version & 0xf000) >> 12) as u8;
+        let version = ((fields.time_hi_and_version & 0xf000) >> 12) as u8;
 
         let time_epoch_millisecs = {
             // Remove the version bits from timestamp
-            let time_hi_and_version = (time_hi_and_version & 0x0fff) as u64;
-            let time_mid = time_mid as u64;
-            let time_low = time_low as u64;
+            let time_hi_and_version = (fields.time_hi_and_version & 0x0fff) as u64;
+            let time_mid = fields.time_mid as u64;
+            let time_low = fields.time_low as u64;
 
             // Combine the 3 fields into full timestamp. This will represent the
             // count of 100-nanosecond intervals since 00:00:00.00, 15 October 1582
@@ -99,6 +131,7 @@ impl UuidFields {
         //     1 0 Y Y Y Y Y Y => The variant specified in RFC 4122.
         //     1 1 0 Y Y Y Y Y => Reserved, Microsoft Corporation backward compatibility
         //     1 1 1 Y Y Y Y Y => Reserved for future definition.
+        let clk_seq_hi_res = fields.clk_seq_hi_res;
         let vmask = match clk_seq_hi_res {
             // Check if bit 7 is 0
             // In this case only bit 7 constitutes variant
@@ -115,26 +148,26 @@ impl UuidFields {
         let variant = clk_seq_hi_res & vmask;
         let clk_seq_hi = clk_seq_hi_res & !vmask;
 
-        let clock_seq = ((clk_seq_hi as u16) << 8) | clk_seq_low as u16;
+        let clock_seq = ((clk_seq_hi as u16) << 8) | fields.clk_seq_low as u16;
 
         Self {
             time: time_epoch_millisecs,
             version,
             variant,
             clock_seq,
-            node_id,
+            node: fields.node,
         }
     }
 
-    /// Returns the timestamp of the UUID as unix time in nanoseconds
-    /// i.e the number of nanoseconds elapsed since 00:00:00 January 1st, 1970
+    /// Returns the timestamp of the UUID. See [`TimeSpec`] for more details about
+    /// the return type 
     pub fn unix_time(&self) -> TimeSpec {
         // The offset in 100-nanosecond intervals
         let offset = crate::constants::MILLISECS_GREGORIAN_UNIX * 10000;
 
         let mut time = ConsumingU64(self.time.saturating_sub(offset));
 
-        let mut timespec = TimeSpec::default();
+        let mut timespec = TimeSpec::zero();
 
         timespec.hecto_nanoseconds = time.divn_mod(10);
         timespec.microseconds = time.divn_mod(1000000);

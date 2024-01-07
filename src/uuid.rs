@@ -1,6 +1,8 @@
 use core::fmt::{Debug, Display};
 use phf::phf_map;
 
+use crate::inspect::{UuidFields, UuidDetails};
+
 trait OctetHex<'a>
 where
     Self: 'a + IntoIterator<Item = &'a u8> + Sized,
@@ -16,7 +18,7 @@ where
 
 impl<'a> OctetHex<'a> for &'a [u8] {}
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Uuid(u128);
 
 impl Display for Uuid {
@@ -106,6 +108,14 @@ impl Uuid {
 
     pub fn value(&self) -> u128 {
         self.0
+    }
+
+    pub fn fields(&self) -> UuidFields {
+        UuidFields::of(self)
+    }
+
+    pub fn details(&self) -> UuidDetails {
+        UuidDetails::construct(&self.fields())
     }
 
     pub fn parse<T: AsRef<str>>(value: T) -> Result<Self, ()> {
