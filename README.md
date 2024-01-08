@@ -16,6 +16,7 @@ println!("{}", uuid);
 
 UUIDs can also pe parsed from strings
 ```rust
+use uuidland::Uuid;
 let uuid = Uuid::parse("fe4d0d06-adf3-1fff-bdd3-325096b39f47").unwrap();
 ```
 
@@ -34,13 +35,15 @@ This crate supports generating V1, V3, V4 and V5 UUIDs. Use the appropriate func
    For versions 3 and 5, a namespace (another UUID) and name are also needed.
 
    ```rust
+   use uuidland::{Uuid, gen};
+
    // Some existing UUID
-   let namespace = Uuid::parse("3f177ecc-9c78-4e9b-b142-1a8aea0e5624")
+   let namespace = Uuid::parse("3f177ecc-9c78-4e9b-b142-1a8aea0e5624").unwrap();
    let uuid_v5 = gen::v5(b"foo", Some(namespace));
 
    // Or use a well-known UUID from uuidland::wellknown module
    use uuidland::wellknown;
-   let uuid_v5 = gen::v5(b"bar", wellknown::NS_DNS);
+   let uuid_v5 = gen::v5(b"bar", Some(wellknown::NS_DNS));
 
    // Or pass None as namespace. In that case, a random UUID will be
    // used as namespace
@@ -50,5 +53,6 @@ This crate supports generating V1, V3, V4 and V5 UUIDs. Use the appropriate func
 - **Randomly Generated (V4)**
 
    ```rust
+   use uuidland::gen   
    let uuid_v4 = gen::v4();
    ```
