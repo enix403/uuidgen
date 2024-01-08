@@ -47,6 +47,7 @@ impl UuidFields {
     }
 }
 
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct UuidDetails {
     /// The 60-bit field of the UUID. This is the number of 100-nanosecond intervals
@@ -83,6 +84,7 @@ pub struct UuidDetails {
 ///
 /// UUIDs store time as count of 100-nanoseconds intervals. So the maximun resolution available is
 /// 100-nanoseconds. As a result, `nanoseconds` will always be a multiple of 100
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct TimeSpec {
     /// Seconds of the timestamp

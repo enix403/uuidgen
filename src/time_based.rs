@@ -4,10 +4,12 @@ use rand::RngCore;
 
 use crate::uuid::{Octets, Uuid};
 
+/// Provides a node ID for time based UUID generators
 pub trait NodeIdProvider {
     fn get_node_id(&self) -> u64;
 }
 
+/// A ['NodeIdProvider'] that gives out random node ID's
 #[derive(Clone, Copy)]
 pub struct RandomNodeIdProvider;
 
@@ -20,6 +22,7 @@ impl NodeIdProvider for RandomNodeIdProvider {
     }
 }
 
+/// A ['NodeIdProvider'] that gives out some fixed node ID's
 #[derive(Clone)]
 pub struct StaticNodeIdProvider(u64);
 
@@ -102,8 +105,10 @@ where
         // Get the current timestamp
         let msec = Self::get_time_milli();
 
+        // The returned UUID is calculated from *current state*, not the next state
         let octets = Self::layout_octets(&self.state);
 
+        // Update the state for the next UUID
         let next_state = Self::tick(&self.state, self.node_id_provider.get_node_id(), msec)?;
         self.state = next_state;
 
@@ -209,11 +214,6 @@ where
         Self(TimeBasedGenerator::new(node_id_provider))
     }
 
-    #[inline(always)]
-    pub fn generate(&mut self) -> Result<Uuid, Error> {
-        self.0.generate()
-    }
-
     #[allow(dead_code)]
     #[inline(always)]
     fn new_with_state(node_id_provider: P, state: TimeBasedState) -> Self {
@@ -221,6 +221,12 @@ where
             //
             TimeBasedGenerator::new_with_state(node_id_provider, state),
         )
+    }
+
+    /// Generates a new Time Based UUID
+    #[inline(always)]
+    pub fn generate(&mut self) -> Result<Uuid, Error> {
+        self.0.generate()
     }
 }
 
