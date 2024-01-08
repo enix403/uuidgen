@@ -8,15 +8,15 @@ use num_traits::cast::ToPrimitive;
 use crate::uuid::Uuid;
 
 /// The individual fields of a UUID as per RFC 4122. Each field is stored in
-/// Big-Endian order
+/// big-endian order
 #[derive(Clone, Debug)]
 pub struct UuidFields {
-    time_low: u32,
-    time_mid: u16,
-    time_hi_and_version: u16,
-    clk_seq_hi_res: u8,
-    clk_seq_low: u8,
-    node: u64,
+    pub time_low: u32,
+    pub time_mid: u16,
+    pub time_hi_and_version: u16,
+    pub clk_seq_hi_res: u8,
+    pub clk_seq_low: u8,
+    pub node: u64,
 }
 
 impl UuidFields {
@@ -71,7 +71,7 @@ pub struct UuidDetails {
 
 /// The time information returned by `UuidFields::unix_time()` method
 ///
-/// UUIDs contain a timestamp with resolution upto nanoseconds, which sometimes doesn't fit
+/// UUIDs contain a timestamp with resolution upto nanoseconds (read below), which sometimes doesn't fit
 /// in a single 64-bit integer. This struct contains the timestamp in a destructed way in multiple
 /// integers, namely `seconds`, `microseconds` and `nanoseconds`. `seconds` stores the number of
 /// seconds in the timestamp. `microseconds` stores the additional microseconds, after one has taken
@@ -80,6 +80,9 @@ pub struct UuidDetails {
 ///
 /// As an example, the full timestamp as a single number in nanoseconds is given by
 /// `seconds * 1_000_000_000 + microseconds * 1000 + nanoseconds`
+///
+/// UUIDs store time as count of 100-nanoseconds intervals. So the maximun resolution available is
+/// 100-nanoseconds. As a result, `nanoseconds` will always be a multiple of 100
 #[derive(Clone, Debug)]
 pub struct TimeSpec {
     /// Seconds of the timestamp
@@ -193,5 +196,48 @@ impl ConsumingU64 {
 
     fn remaining(self) -> u64 {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_uuid_fields() {
+        let uuid = Uuid::parse("ae968d8a-adf0-11ee-ba05-325096b39f47").unwrap();
+
+        let f = UuidFields::of(&uuid);
+
+        assert_eq!(f.time_low, 0xAE_96_8D_8A);
+        assert_eq!(f.time_mid, 0xAD_F0);
+        assert_eq!(f.time_hi_and_version, 0x11_EE);
+        assert_eq!(f.clk_seq_hi_res, 0xBA);
+        assert_eq!(f.clk_seq_low, 0x05);
+        assert_eq!(f.node, 0x32_50_96_B3_9F_47);
+    }
+
+    #[test]
+    fn test_uuid_details() {
+        let uuid = Uuid::parse("e47e7da8-adf1-11ee-b053-325096b39f47").unwrap();
+        let d = UuidDetails::construct(&UuidFields::of(&uuid));
+
+        assert_eq!(d.time, 139239892927282600);
+        assert_eq!(d.version, 1);
+        assert_eq!(d.variant, 0b10000000);
+        assert_eq!(d.clock_seq, 12371);
+        assert_eq!(d.node, 0x32_50_96_b3_9f_47);
+    }
+
+    #[test]
+    fn test_unix_time() {
+        let uuid = Uuid::parse("fe4d0d06-adf3-1fff-bdd3-325096b39f47").unwrap();
+        let d = UuidDetails::construct(&UuidFields::of(&uuid));
+
+        let time = d.unix_time();
+
+        assert_eq!(time.seconds, 103063836508);
+        assert_eq!(time.microseconds, 525696);
+        assert_eq!(time.nanoseconds, 600);
     }
 }
