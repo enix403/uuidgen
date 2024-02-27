@@ -9,6 +9,7 @@ use crate::uuid::Uuid;
 
 /// The individual fields of a UUID as per RFC 4122. Each field is stored in
 /// big-endian order
+#[cfg_attr(feature = "wasm-bindgen", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct UuidFields {
     pub time_low: u32,
